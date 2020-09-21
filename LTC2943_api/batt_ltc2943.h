@@ -2,36 +2,38 @@
 #include <stdint.h>
 class batt_gauge_ltc2943 
 {
-
-#define LTC2943_I2C_ADDR   0x64
 public:
 	// Enumeration of LTC2943 ADC modes
-	typedef enum
+	enum class ADCMode
 	{
 		AUTOMATIC = 3,
 		SCAN = 2,
 		MANUAL = 1,
 		SLEEP = 0,
 		NONE = 255			// Will indicate errors in adc mode getter
-	} adc_mode_t;
+	};
 
 	// Status for API calls
-	typedef enum
+	enum class LTCStatus
 	{
 		STATUS_ERR,
 		STATUS_OK
-	} ltc_status_t;
+	};
 
+	// Pointer to driver
+	i2c_driver* driver;
+	// Constructor
+	batt_gauge_ltc2943(i2c_driver* dr);
 	// Will set selected ADC mode for chip
-	ltc_status_t set_adc_mode(adc_mode_t mode, i2c_driver& driver);
+	LTCStatus set_adc_mode(ADCMode mode);
 	// Will get current ADC mode on chip
-	ltc_status_t get_adc_mode(i2c_driver& driver, adc_mode_t& output);
+	LTCStatus get_adc_mode(ADCMode& output);
 	// Checks if temperature alert is pending
-	ltc_status_t is_temp_alert_pending(i2c_driver& driver, bool& output);
+	LTCStatus is_temp_alert_pending(bool& output);
 	// Checks if voltage alert is pending
-	ltc_status_t is_volt_alert_pending(i2c_driver& driver, bool& output);
+	LTCStatus is_volt_alert_pending(bool& output);
 private:
-
+	const uint8_t LTC2943_I2C_ADDR = 0x64;
 	// Enumeration of LTC2943 Registers
 	typedef enum
 	{
@@ -75,8 +77,8 @@ private:
 		uint8_t					  all;
 	} control_reg;
 
-	ltc_status_t	read_register(i2c_driver& driver, ltc2943_register_t reg, uint8_t* data_out, uint8_t size);
-	ltc_status_t	write_register(i2c_driver& driver, ltc2943_register_t reg, uint8_t* data, uint8_t size);
-	ltc_status_t	check_i2c_init(i2c_driver& driver);
+	LTCStatus	read_register(ltc2943_register_t reg, uint8_t* data_out, uint8_t size);
+	LTCStatus	write_register(ltc2943_register_t reg, uint8_t* data, uint8_t size);
+	LTCStatus	check_i2c_init();
 
 };

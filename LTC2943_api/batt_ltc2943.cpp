@@ -25,29 +25,31 @@ bool i2cWrite(uint8_t address, const uint8_t *pSrc, uint16_t dataSize); // Write
 */
 #include "i2c_driver.h"
 #include "batt_ltc2943.h"
+#include <vector>
+using namespace std;
 
 
 // Will set selected ADC mode for chip
-batt_gauge_ltc2943::ltc_status_t batt_gauge_ltc2943::set_adc_mode(adc_mode_t mode, i2c_driver& driver)
+batt_gauge_ltc2943::LTCStatus batt_gauge_ltc2943::set_adc_mode(ADCMode mode)
 {
-	ltc_status_t status = STATUS_ERR;
+	LTCStatus status = LTCStatus::STATUS_ERR;
 	control_reg data;
 	uint8_t mode_bits = 0x00;
 	uint8_t out = 0x00;
 
 	// Only execute if i2c is initialized 
-	if ((check_i2c_init(driver) != STATUS_OK) || (mode == NONE))
+	if ((check_i2c_init() != LTCStatus::STATUS_OK) || (mode == ADCMode::NONE))
 	{
-		return STATUS_ERR;
+		return LTCStatus::STATUS_ERR;
 	}
 
 	// ADC mode is set by programing the CONTROL register bits B[7:6]
 	// [11] Automatic; [10] Scan; [01] Manual; [00] Sleep
 
 	// Read, to not override other parameters 
-	if (read_register(driver, CONTROL, &out, 1) != STATUS_OK)
+	if (read_register(CONTROL, &out, 1) != LTCStatus::STATUS_OK)
 	{
-		return STATUS_ERR;
+		return LTCStatus::STATUS_ERR;
 	}
 	data.all = out;
 
@@ -55,134 +57,138 @@ batt_gauge_ltc2943::ltc_status_t batt_gauge_ltc2943::set_adc_mode(adc_mode_t mod
 	data.reg_val.adc_mode = (uint8_t) mode;
 
 	// Write
-	return write_register(driver, CONTROL, &data.all, 1);
+	return write_register(CONTROL, &data.all, 1);
 
 }
 
 
 // Will get current ADC mode on chip
-batt_gauge_ltc2943::ltc_status_t batt_gauge_ltc2943::get_adc_mode(i2c_driver& driver, adc_mode_t& output)
+batt_gauge_ltc2943::LTCStatus batt_gauge_ltc2943::get_adc_mode(ADCMode& output)
 {
-	adc_mode_t  adc_mode = NONE;
+	ADCMode adc_mode = ADCMode::NONE;
 	control_reg data;
 	uint8_t out = 0x00;
 	
 	// Only execute if i2c is initialized 
-	if (check_i2c_init(driver) != STATUS_OK)
+	if (check_i2c_init() != LTCStatus::STATUS_OK)
 	{
-		return STATUS_ERR;
+		return LTCStatus::STATUS_ERR;
 	}
 	
 	// ADC mode is get by reading the CONTROL register bits B[7:6]
-	if (read_register(driver, CONTROL, &out, 1) != STATUS_OK)
+	if (read_register(CONTROL, &out, 1) != LTCStatus::STATUS_OK)
 	{
-		return STATUS_ERR;
+		return LTCStatus::STATUS_ERR;
 	}
 
 	data.all = out;
-	output = (adc_mode_t) data.reg_val.adc_mode;
-	return STATUS_OK;
+	output = (ADCMode) data.reg_val.adc_mode;
+	return LTCStatus::STATUS_OK;
 }
 
 
 // Checks if temperature alert is pending
-batt_gauge_ltc2943::ltc_status_t batt_gauge_ltc2943::is_temp_alert_pending(i2c_driver& driver, bool& output)
+batt_gauge_ltc2943::LTCStatus batt_gauge_ltc2943::is_temp_alert_pending(bool& output)
 {
 	uint8_t data = 0x00;
 	// Only execute if i2c is initialized 
-	if (check_i2c_init(driver) != STATUS_OK)
+	if (check_i2c_init() != LTCStatus::STATUS_OK)
 	{
-		return STATUS_ERR;
+		return LTCStatus::STATUS_ERR;
 	}
 
 	// Temperature alert is in STATUS Register bit A[4]
 	// Get status register
-	if (read_register(driver, STATUS, &data, 1) != STATUS_OK)
+	if (read_register(STATUS, &data, 1) != LTCStatus::STATUS_OK)
 	{
-		return STATUS_ERR;
+		return LTCStatus::STATUS_ERR;
 	}
 	// Check coresponding bit
 	output = (bool)((data >> 4) & 0x01);
 
-	return STATUS_OK;
+	return LTCStatus::STATUS_OK;
 }
 
 
 // Checks if voltage alert is pending
-batt_gauge_ltc2943::ltc_status_t batt_gauge_ltc2943::is_volt_alert_pending(i2c_driver& driver, bool& output)
+batt_gauge_ltc2943::LTCStatus batt_gauge_ltc2943::is_volt_alert_pending(bool& output)
 {
 	uint8_t data = 0x00;
 	// Only execute if i2c is initialized 
-	if (check_i2c_init(driver) != STATUS_OK)
+	if (check_i2c_init() != LTCStatus::STATUS_OK)
 	{
-		return STATUS_ERR;
+		return LTCStatus::STATUS_ERR;
 	}
 	
 	// Voltage alert is in STATUS Register bit A[1]
 	// Get status register
-	if (read_register(driver, STATUS, &data, 1) != STATUS_OK)
+	if (read_register(STATUS, &data, 1) != LTCStatus::STATUS_OK)
 	{
-		return STATUS_ERR;
+		return LTCStatus::STATUS_ERR;
 	}
 	// Check coresponding bit
 	output = (bool)((data >> 1) & 0x01);
 
-	return STATUS_OK;
+	return LTCStatus::STATUS_OK;
+}
+
+batt_gauge_ltc2943::batt_gauge_ltc2943(i2c_driver* dr)
+{
+	driver = dr;
 }
 
 
-batt_gauge_ltc2943::ltc_status_t batt_gauge_ltc2943::read_register(i2c_driver& driver, ltc2943_register_t reg, uint8_t* data_out, uint8_t size)
+batt_gauge_ltc2943::LTCStatus batt_gauge_ltc2943::read_register(ltc2943_register_t reg, uint8_t* data_out, uint8_t size)
 {
 	const uint8_t write_data = reg;
 	// For reading we first write
-	if (!driver.i2cWrite(LTC2943_I2C_ADDR, &write_data, 1))
+	if (!driver->i2cWrite(LTC2943_I2C_ADDR, &write_data, 1))
 	{
-		return STATUS_ERR;
+		return LTCStatus::STATUS_ERR;
 	}
 	// Read values
-	if (!driver.i2cRead(LTC2943_I2C_ADDR, data_out, size))
+	if (!driver->i2cRead(LTC2943_I2C_ADDR, data_out, size))
 	{
-		return STATUS_ERR;
+		return LTCStatus::STATUS_ERR;
 	}
 
 
-	return STATUS_ERR;
+	return LTCStatus::STATUS_ERR;
 }
 
 
-batt_gauge_ltc2943::ltc_status_t batt_gauge_ltc2943::write_register(i2c_driver& driver, ltc2943_register_t reg, uint8_t* data, uint8_t size)
+batt_gauge_ltc2943::LTCStatus batt_gauge_ltc2943::write_register(ltc2943_register_t reg, uint8_t* data, uint8_t size)
 {
-	uint8_t buff[20] = { 0 };
-	uint8_t min = (size > 20) ? 20 : size;
 	// Form data
+	vector<uint8_t> buff; 
 	buff[0] = (uint8_t) reg;
 	
 	// Copy data to buff until size or buff maximum size 
-	for (int i = 0; i < min; i++)
+	for (uint8_t i = 0; i < size; i++)
 	{
-		buff[i + 1] = *(data + 1);
+		buff.push_back(*(data + i));
 	}
 
 	// Write data through I2C
-	if (!driver.i2cWrite(LTC2943_I2C_ADDR, buff, size + 1))
+	if (!driver->i2cWrite(LTC2943_I2C_ADDR, &buff[0], size + 1))
 	{
-		return STATUS_ERR;
+		return LTCStatus::STATUS_ERR;
 	}
 
-	return STATUS_OK;
+	return LTCStatus::STATUS_OK;
 }
 
 
-batt_gauge_ltc2943::ltc_status_t batt_gauge_ltc2943::check_i2c_init(i2c_driver& driver)
+batt_gauge_ltc2943::LTCStatus batt_gauge_ltc2943::check_i2c_init()
 {
-	if (!driver.i2cIsInitialized())
+	if (!driver->i2cIsInitialized())
 	{
 		// If not try to init
-		if (!driver.i2cInit())
+		if (!driver->i2cInit())
 		{
 			// Can't init - return error
-			return STATUS_ERR;
+			return LTCStatus::STATUS_ERR;
 		}
 	}
-	return STATUS_OK;
+	return LTCStatus::STATUS_OK;
 }
